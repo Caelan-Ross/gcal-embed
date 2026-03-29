@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Calendar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js"></script>
+</head>
+<body>
+<div class="header">
+  <button class="today-btn" onclick="goToday()">Today</button>
+  <button class="nav-btn" onclick="prevMonth()">&#8249;</button>
+  <button class="nav-btn" onclick="nextMonth()">&#8250;</button>
+  <span class="month-label" id="monthLabel"></span>
+  <span class="loading-badge" id="loadingBadge"></span>
+</div>
+<div class="error-msg" id="errorMsg"></div>
+<div class="dow-row">
+  <div class="dow-cell">Sun</div>
+  <div class="dow-cell">Mon</div>
+  <div class="dow-cell">Tue</div>
+  <div class="dow-cell">Wed</div>
+  <div class="dow-cell">Thu</div>
+  <div class="dow-cell">Fri</div>
+  <div class="dow-cell">Sat</div>
+</div>
+<div class="grid" id="calGrid"></div>
+<div class="day-panel" id="dayPanel" onclick="closeDayPanel(event)">
+  <div class="day-panel-inner">
+    <div class="day-panel-title" id="dayPanelTitle"></div>
+    <div id="dayPanelEvents"></div>
+  </div>
+</div>
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle"></div>
+      <button class="modal-close" onclick="closeModal()">x</button>
+    </div>
+    <div class="modal-meta" id="modalMeta"></div>
+  </div>
+</div>
+<script>
+  const API_KEY     = ENV.API_KEY;
+  const CALENDAR_ID = ENV.CALENDAR_ID;
+
+  let currentYear, currentMonth, allEvents = [];
+  const today = new Date();
+
+  function init() {
+    currentYear  = today.getFullYear();
+    currentMonth = today.getMonth();
+    render();
+  }
+
+  function goToday() {
+    currentYear  = today.getFullYear();
+    currentMonth = today.getMonth();
+    render();
+  }
+
+  function prevMonth() {
+    currentMonth--;
+    if (currentMonth < 0) {
+      currentMonth = 11;
+      currentYear--;
+    }
+    render();
+  }
+
+  function nextMonth() {
+    currentMonth++;
+    if (currentMonth > 11) {
+      currentMonth = 0;
+      currentYear++;
+    }
+    render();
+  }
+
+  async function fetchEvents(year, month) {
+    const loadingBadge = document.getElementById('loadingBadge');
+    const errorEl      = document.getElementById('errorMsg');
+    loadingBadge.textContent = 'loading...';
+    errorEl.style.display    = 'none';
+
+    const rangeStart = new Date(year, month, 1).toISOString();
+    const rangeEnd   = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+
+    try {
+      const response   = await fetch('/api/events?timeMin=' + encodeURIComponent(rangeStart) + '&timeMax=' + encodeURIComponent(rangeEnd));
+      const jsonData   = await response.json();
+      if (jsonData.error) {
+        throw new Error(jsonData.error.message);
+      }
+      loadingBadge.textContent = '';
+      return jsonData.items || [];
+    } catch (fetchError) {
+      loadingBadge.textContent = '';
+      errorEl.textContent      = 'API error: ' + fetchError.message;
+      errorEl.style.display    = 'block';
+      return [];
+    }
+  }
+
+  function formatTime(dateStr) {
+    if (!dateStr) {
+      return '';
+    }
+    if (!dateStr.includes('T')) {
+      return 'All day';
+    }
+    const dateObj = new Date(dateStr);
+    return dateObj.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit', hour12: true });
+  }
+
+  function formatDateRange(startObj, endObj) {
+    const startVal = startObj.dateTime || startObj.date;
+    const endVal   = endObj && (endObj.dateTime || endObj.date);
+    if (!startVal) {
+      return '';
+    }
+    if (!startVal.includes('T')) {
+      const startDate = new Date(startVal + 'T00:00:00');
+      return startDate.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
+    }
+    const startDate  = new Date(startVal);
+    const endDate    = endVal ? new Date(endVal) : null;
+    const dateLabel  = startDate.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
+    const startTime  = formatTime(startVal);
+    const endTime    = endDate ? formatTime(endVal) : '';
+    return dateLabel + ' - ' + startTime + (endTime ? ' to ' + endTime : '');
+  }
+
+  function getEventDateKey(event) {
+    const startVal = event.start.dateTime || event.start.date;
+    if (startVal.includes('T')) {
+      return startVal.slice(0, 10);
+    }
+    return startVal;
+  }
+
+  async function render() {
+    const monthNames = ['January','February','March','April','May','June',
+                        'July','August','September','October','November','December'];
+    document.getElementById('monthLabel').textContent = monthNames[currentMonth] + ' ' + currentYear;
+
+    allEvents = await fetchEvents(currentYear, currentMonth);
+
+    const eventsByDate = {};
+    allEvents.forEach(event => {
+      const dateKey = getEventDateKey(event);
+      if (!eventsByDate[dateKey]) {
+        eventsByDate[dateKey] = [];
+      }
+      eventsByDate[dateKey].push(event);
+    });
+
+    const calGrid = document.getElementById('calGrid');
+    calGrid.innerHTML = '';
+
+    const firstDayOfWeek  = new Date(currentYear, currentMonth, 1).getDay();
+    const daysInMonth     = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const prevMonthDays   = new Date(currentYear, currentMonth, 0).getDate();
+    const todayDateKey    = today.getFullYear() + '-'
+                          + String(today.getMonth() + 1).padStart(2, '0') + '-'
+                          + String(today.getDate()).padStart(2, '0');
+
+    for (let offset = 0; offset < firstDayOfWeek; offset++) {
+      const dayNum      = prevMonthDays - firstDayOfWeek + 1 + offset;
+      const prevMonth   = currentMonth === 0 ? 11 : currentMonth - 1;
+      const prevYear    = currentMonth === 0 ? currentYear - 1 : currentYear;
+      const dateKey     = prevYear + '-' + String(prevMonth + 1).padStart(2, '0') + '-' + String(dayNum).padStart(2, '0');
+      calGrid.appendChild(makeCell(dayNum, dateKey, true, false, eventsByDate[dateKey] || []));
+    }
+
+    for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+      const dateKey = currentYear + '-' + String(currentMonth + 1).padStart(2, '0') + '-' + String(dayNum).padStart(2, '0');
+      calGrid.appendChild(makeCell(dayNum, dateKey, false, dateKey === todayDateKey, eventsByDate[dateKey] || []));
+    }
+
+    const totalCells    = firstDayOfWeek + daysInMonth;
+    const trailingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+    for (let dayNum = 1; dayNum <= trailingCells; dayNum++) {
+      const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+      const nextYear  = currentMonth === 11 ? currentYear + 1 : currentYear;
+      const dateKey   = nextYear + '-' + String(nextMonth + 1).padStart(2, '0') + '-' + String(dayNum).padStart(2, '0');
+      calGrid.appendChild(makeCell(dayNum, dateKey, true, false, eventsByDate[dateKey] || []));
+    }
+  }
+
+  function makeCell(dayNum, dateKey, isOtherMonth, isToday, events) {
+    const cell = document.createElement('div');
+    cell.className = 'day-cell'
+      + (isOtherMonth ? ' other-month' : '')
+      + (isToday      ? ' today'       : '');
+
+    const dayNumEl       = document.createElement('div');
+    dayNumEl.className   = 'day-num';
+    dayNumEl.textContent = dayNum;
+    cell.appendChild(dayNumEl);
+
+    const MAX_VISIBLE   = 2;
+    const visibleEvents = events.slice(0, MAX_VISIBLE);
+
+    visibleEvents.forEach(event => {
+      const pill       = document.createElement('div');
+      pill.className   = 'event-pill';
+      const title      = event.summary || '(no title)';
+      const timePrefix = event.start.dateTime ? formatTime(event.start.dateTime) + ' ' : '';
+      pill.textContent = timePrefix + title;
+      pill.title       = timePrefix + title;
+      pill.onclick     = function(clickEvent) {
+        clickEvent.stopPropagation();
+        openModal(event);
+      };
+      cell.appendChild(pill);
+    });
+
+    if (events.length > MAX_VISIBLE) {
+      const moreLabel       = document.createElement('div');
+      moreLabel.className   = 'more-label';
+      moreLabel.textContent = '+ ' + (events.length - MAX_VISIBLE) + ' more';
+      moreLabel.onclick     = function(clickEvent) {
+        clickEvent.stopPropagation();
+        openDayPanel(dateKey, events);
+      };
+      cell.appendChild(moreLabel);
+    }
+
+    cell.onclick = function() { openDayPanel(dateKey, events); };
+    return cell;
+  }
+
+  function openDayPanel(dateKey, events) {
+    const panelEl      = document.getElementById('dayPanel');
+    const panelTitle   = document.getElementById('dayPanelTitle');
+    const panelEvents  = document.getElementById('dayPanelEvents');
+
+    const dateObj      = new Date(dateKey + 'T12:00:00');
+    panelTitle.textContent = dateObj.toLocaleDateString('en-CA', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+    });
+    panelEvents.innerHTML = '';
+
+    if (!events.length) {
+      panelEvents.innerHTML = '<div class="no-events">No events</div>';
+    } else {
+      events.forEach(event => {
+        const itemEl    = document.createElement('div');
+        itemEl.className = 'day-event-item';
+
+        const dotEl    = document.createElement('div');
+        dotEl.className = 'day-event-dot';
+
+        const infoEl   = document.createElement('div');
+        const nameEl   = document.createElement('div');
+        nameEl.className   = 'day-event-name';
+        nameEl.textContent = event.summary || '(no title)';
+
+        const timeEl   = document.createElement('div');
+        timeEl.className   = 'day-event-time';
+        timeEl.textContent = formatTime(event.start.dateTime || event.start.date);
+
+        infoEl.appendChild(nameEl);
+        infoEl.appendChild(timeEl);
+        itemEl.appendChild(dotEl);
+        itemEl.appendChild(infoEl);
+
+        itemEl.onclick = function() {
+          closeDayPanel();
+          openModal(event);
+        };
+        panelEvents.appendChild(itemEl);
+      });
+    }
+    panelEl.classList.add('open');
+  }
+
+  function closeDayPanel(clickEvent) {
+    if (!clickEvent || clickEvent.target === document.getElementById('dayPanel')) {
+      document.getElementById('dayPanel').classList.remove('open');
+    }
+  }
+
+  function openModal(event) {
+    document.getElementById('modalTitle').textContent = event.summary || '(no title)';
+    const metaEl = document.getElementById('modalMeta');
+    metaEl.innerHTML = '';
+
+    const timeRange = formatDateRange(event.start, event.end);
+    if (timeRange) {
+      metaEl.innerHTML += '<span>' + timeRange + '</span>';
+    }
+    if (event.location) {
+      const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(event.location);
+      metaEl.innerHTML += '<span><span class="icon">📍</span><a href="' + mapsUrl + '" target="_blank" style="color:var(--accent);text-decoration:none;">' + event.location + '</a></span>';
+    }
+    if (event.description) {
+      const plainDesc = event.description.replace(/<[^>]*>/g, '').trim();
+      if (plainDesc) {
+        metaEl.innerHTML += '<span><span class="icon">📝</span>' + plainDesc.slice(0, 200) + (plainDesc.length > 200 ? '...' : '') + '</span>';
+      }
+    }
+    if (event.htmlLink) {
+      metaEl.innerHTML += '<span><a href="' + event.htmlLink + '" target="_blank" style="color:var(--accent);text-decoration:none;">Open in Google Calendar</a></span>';
+    }
+    document.getElementById('modalOverlay').classList.add('open');
+  }
+
+  function closeModal(clickEvent) {
+    if (!clickEvent || clickEvent.target === document.getElementById('modalOverlay')) {
+      document.getElementById('modalOverlay').classList.remove('open');
+    }
+  }
+
+  document.addEventListener('keydown', function(keyEvent) {
+    if (keyEvent.key === 'Escape') {
+      closeModal();
+      closeDayPanel();
+    }
+  });
+
+  init();
+</script>
+</body>
+</html>
