@@ -3,8 +3,8 @@ const https   = require('https');
 const path    = require('path');
 const app     = express();
 
-const API_KEY     = config.API_KEY;
-const CALENDAR_ID = config.CALENDAR_ID;
+const API_KEY     = process.env.API_KEY;
+const CALENDAR_ID = process.env.CALENDAR_ID;
 
 app.use(express.static(path.join(__dirname, 'public')));
 
