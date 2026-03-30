@@ -1,12 +1,10 @@
 # gcal-embed
-
 A Google Calendar frontend with a cleaner visual style, designed to be embedded in a [Homepage](https://github.com/gethomepage/homepage) server dashboard. Proxies Google Calendar API requests through a lightweight Express server to keep your API key off the client.
 
 ## Stack
-
 - **Frontend:** Vanilla HTML/CSS/JS
 - **Backend:** Node.js + Express (API proxy)
-- **Served by:** Nginx (static) + Node on port 3000
+- **Served by:** Node on port 3000
 
 ## Project Structure
 ```
@@ -14,7 +12,6 @@ gcal-embed/
 ├── public/
 │   ├── index.html
 │   ├── styles.css
-│   └── config.js       # ← not committed, see below
 ├── server.js
 ├── package.json
 └── .gitignore
@@ -29,37 +26,35 @@ cd gcal-embed
 npm install
 ```
 
-### 2. Create your config file
-
-`config.js` is excluded from version control. Create it at `public/config.js`:
-```js
-const ENV = {
-  API_KEY:     'YOUR_GOOGLE_API_KEY',
-  CALENDAR_ID: 'your.email@gmail.com',
-};
-
-// Node.js compatibility
-if (typeof module !== 'undefined') {
-  module.exports = ENV;
-}
+### 2. Run with Docker Compose
+Add the following to your `docker-compose.yml`:
+```yaml
+gcal:
+  image: node:20-alpine
+  container_name: gcal-embed
+  working_dir: /app
+  volumes:
+    - /opt/gcal-embed:/app
+  ports:
+    - "8099:3000"
+  environment:
+    API_KEY: "your_google_api_key"
+    CALENDAR_ID: "your.email@gmail.com"
+  command: sh -c "npm install && node server.js"
+  restart: unless-stopped
 ```
 
-Replace `YOUR_GOOGLE_API_KEY` with a key from [Google Cloud Console](https://console.cloud.google.com/) with the **Google Calendar API** enabled. Restrict the key to the Calendar API and your server's IP/domain.
-
-### 3. Run the server
-```bash
-node server.js
-```
-
-The proxy runs on port `3000`. Point Nginx at it or access directly at `http://your-server:3000`.
+Replace `API_KEY` and `CALENDAR_ID` with your values. The proxy runs on port `3000`, mapped to `8099` on the host.
 
 ## Google API Key
-
 1. Go to [console.cloud.google.com](https://console.cloud.google.com/)
 2. Create a project → Enable **Google Calendar API**
 3. Create an API key under **Credentials**
 4. Restrict the key to the Calendar API
 
-## .gitignore
+## Calendar Setup
+Your calendar must be set to **public** for the API key method to work:
+- Google Calendar → gear icon → Settings → your calendar → **Access permissions for events** → check **Make available to public**
 
-`config.js` is intentionally ignored to keep your API key out of version control. Never commit it.
+## .gitignore
+API credentials are passed via environment variables and never written to disk or committed to version control.
