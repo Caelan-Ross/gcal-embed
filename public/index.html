@@ -16,6 +16,14 @@
   <button class="nav-btn" onclick="nextMonth()">&#8250;</button>
   <span class="month-label" id="monthLabel"></span>
   <span class="loading-badge" id="loadingBadge"></span>
+<div class="legend">
+  <div class="legend-item"><span class="legend-dot" style="background:#4a86e8"></span>Personal</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#cc0000"></span>Bills</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#c4a000"></span>Days Off</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#16a765"></span>Gym</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#e91e8c"></span>Pay Days</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#795548"></span>Rx</div>
+</div>
 </div>
 <div class="error-msg" id="errorMsg"></div>
 <div class="dow-row">
@@ -208,6 +216,7 @@
     visibleEvents.forEach(event => {
       const pill       = document.createElement('div');
       pill.className   = 'event-pill';
+      pill.style.backgroundColor = event._calendarColor || '#4a86e8';
       const title      = event.summary || '(no title)';
       const timePrefix = event.start.dateTime ? formatTime(event.start.dateTime) + ' ' : '';
       pill.textContent = timePrefix + title;
