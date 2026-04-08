@@ -11,6 +11,7 @@ const CALENDAR_IDS = {
   gym:            process.env.GYM_CAL,
   payDays:        process.env.PAY_DAYS_CAL,
   rxAppointments: process.env.RX_CAL,
+  anime:          process.env.ANIME_CAL,
 };
 const CALENDAR_COLORS = {
   main:           '#4a86e8', // blue
@@ -19,6 +20,7 @@ const CALENDAR_COLORS = {
   gym:            '#16a765', // teal
   payDays:        '#e91e8c', // pink
   rxAppointments: '#795548', // brown
+  anime:          '#ff5e00', // orange
 };
 
 function fetchCalendar(name, calendarId, timeMin, timeMax) {
