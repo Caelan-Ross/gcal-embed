@@ -2,6 +2,7 @@
 A Google Calendar frontend with a cleaner visual style, designed to be embedded in a [Homepage](https://github.com/gethomepage/homepage) server dashboard. Proxies Google Calendar API requests through a lightweight Express server to keep your API key off the client.
 
 Supports multiple sub-calendars with per-calendar colour coding and a colour legend.
+<img width="860" height="1119" alt="image" src="https://github.com/user-attachments/assets/1fab21c8-7945-43b4-87d5-8a2f8498c92e" />
 
 ## Stack
 - **Frontend:** Vanilla HTML/CSS/JS
